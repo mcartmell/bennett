@@ -15,9 +15,35 @@ class Project < ActiveRecord::Base
 
   def self.build_all_nightly!
     Project.where(build_nightly: true).each do |project|
-      build = project.builds.create
-      Resque.enqueue(CommitsFetcher, build.id)
+      project.build_all_new!(true)
     end
+    return
+  end
+
+  def self.build_all_new!
+    Project.all.each {|proj| proj.build_all_new!}
+    return
+  end
+
+  def build_all_new!(include_default = false)
+    all_new_branches(include_default).each do |build|
+      if build.save
+        Resque.enqueue(CommitsFetcher, build.id)
+      else
+        Rails.logger.error("Couldn't save build: #{build.errors}")
+      end
+    end
+    return
+  end
+
+  def all_new_branches(include_default = false)
+    g = Git.open(folder_path)
+    all_branches = g.branches.remote.map(&:name)
+    builds = all_branches.map {|br| self.builds.new(branch: br)}
+    fetch = g.fetch
+
+    # Always build the default branch if requested
+    builds.select {|b| b.new_activity?(fetch) || (include_default && (b.branch == self.branch)) }
   end
 
   def last_build

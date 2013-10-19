@@ -2,6 +2,7 @@
   %td
     - if build && build.has_commit_info? && build.results.any?
       .commit-hash= build.short_hash
+      .commit-branch= build.branch
       .commit-message= build.commit_message
       .commit-details
         %span.commit-date= time_ago_in_words(build.commit_date)

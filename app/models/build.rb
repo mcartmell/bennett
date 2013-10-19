@@ -72,7 +72,7 @@ class Build < ActiveRecord::Base
   def update_commit!
     git = Git.open(project.folder_path)
     git.reset_hard
-    git.checkout(project.branch)
+    git.checkout(branch)
     git.lib.send(:command, 'pull')
     git.checkout(commit_hash)
   end
@@ -105,8 +105,8 @@ class Build < ActiveRecord::Base
   def fetch_commit!
     git = Git.open(project.folder_path)
     git.fetch
-    branch = git.branches["remotes/origin/#{project.branch}"] # TODO: make this smarter
-    commit = branch.gcommit.log(1).first
+    br = git.branches["remotes/origin/#{branch}"]
+    commit = br.gcommit.log(1).first
     self.commit_hash = commit.sha
     self.commit_message = commit.message
     self.commit_author = commit.author.name
@@ -115,10 +115,12 @@ class Build < ActiveRecord::Base
     save!
   end
 
-  def new_activity?
-    git = Git.open(project.folder_path)
-    res = git.fetch
-    res.include?(project.branch)
+  def new_activity?(res = nil)
+    unless res
+      git = Git.open(project.folder_path)
+      res = git.fetch
+    end
+    return res.match(%r{/#{branch}\S*\Z}) ? true : false
   end
 
   def delete_jobs_in_queues
